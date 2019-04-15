@@ -411,9 +411,9 @@ class Triangle(Program):
         ctx.stroke()
 
     def constituentLines(self):
-        return [Line(self.p1, self.p2),
-                Line(self.p2, self.p3),
-                Line(self.p3, self.p1)]
+        return [Line([self.p1, self.p2]),
+                Line([self.p2, self.p3]),
+                Line([self.p3, self.p1])]
 
     def intersects(self,o):
         for l in self.constituentLines():
