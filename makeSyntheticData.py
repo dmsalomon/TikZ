@@ -27,7 +27,7 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
 
     #pixels = [ Image.fromarray(ps*255).convert('L') for ps in pixels ]
     pixels = dict(zip(distinctPrograms,pixels))
-    
+
     for j in range(len(programs)):
         pickle.dump(programs[j], open("%s-%d.p"%(filePrefix,j + offset),'wb'))
         unlabeledPixels = 1 - pixels[noisyTargets[j]]
@@ -42,7 +42,7 @@ def makeSyntheticData(filePrefix, sample, k = 1000, offset = 0):
 
         if False:
             Image.fromarray(255*programs[j].draw()).convert('L').save("%s-%d-clean.png"%(filePrefix,j + offset))
-            
+
 def canonicalOrdering(things):
     if things == [] or not CANONICAL: return things
     cs = [c for c in things if isinstance(c,Circle) ]
@@ -56,7 +56,9 @@ def canonicalOrdering(things):
                                      l.solid,l.arrow))
     ts = [t for t in things if isinstance(t,Label) ]
     ts = sorted(ts, key = lambda t: (t.p.x,t.p.y))
-    return cs + rs + ls + ts
+    bs = [b for b in things if isinstance(b,Triangle)]
+    bs = sorted(bs, key = lambda b: (b.p1.x,b.p1.y,b.p2.x,b.p2.y,b.p3.x,b.p3.y))
+    return cs + bs + rs + ls + ts
 
 
 def proposeAttachmentLines(objects):
@@ -71,7 +73,7 @@ def proposeAttachmentLines(objects):
         for k in range(j + 1,len(attachmentSets)):
             for (x1,y1,o1) in attachmentSets[j]:
                 for (x2,y2,o2) in attachmentSets[k]:
-                    
+
                     candidate = None
                     isAligned = True
                     if x2 == x1 and y1 != y2 and o1 == 'v' and o2 == 'v':
@@ -81,7 +83,7 @@ def proposeAttachmentLines(objects):
                     else:
                         candidate = (x1,y1,x2,y2)
                         isAligned = False
-                        
+
                     if candidate != None:
                         l = Line.absolute((candidate[0]),
                                           (candidate[1]),
@@ -124,6 +126,10 @@ def sampleCircle(objects):
         c = Circle(p,r)
         if c.inbounds(): return c
 
+def sampleTriangle(objects):
+    t = Triangle.sample()
+    return t
+
 def sampleRectangle(objects):
     while True:
         p1 = samplePoint(objects)
@@ -142,7 +148,7 @@ def sampleLabel(objects):
     l = Label.sample()
     l.p = samplePoint(objects)
     return l
-                                
+
 
 def sampleLine(objects, attachedLines = []):
     concentration = 2.0
@@ -185,15 +191,16 @@ def sampleWithoutIntersection(n, existingObjects, f):
         attemptsSoFar += 1
         if attemptsSoFar > maximumAttempts:
             break
-        
+
         newObject = f()
         if not any([o.intersects(newObject) for o in existingObjects ]):
             existingObjects += [newObject]
     return existingObjects
 
-def multipleObjects(rectangles = 0,lines = 0,circles = 0,labels = 0):
+def multipleObjects(rectangles = 0,lines = 0,circles = 0,triangles = 0, labels = 0):
     def sampler():
         objects = []
+        objects = sampleWithoutIntersection(triangles, objects, lambda: sampleTriangle(objects))
         objects = sampleWithoutIntersection(circles, objects, lambda: sampleCircle(objects))
         objects = sampleWithoutIntersection(rectangles, objects, lambda: sampleRectangle(objects))
         objects = sampleWithoutIntersection(labels, objects, lambda: sampleLabel(objects))
@@ -207,17 +214,18 @@ def randomScene(maximumNumberOfObjects):
         while True:
             n = choice(range(maximumNumberOfObjects)) + 1
             if NIPSPRIMITIVES():
-                shapeIdentities = [choice(range(3)) for _ in range(n) ]
-            else:
                 shapeIdentities = [choice(range(4)) for _ in range(n) ]
+            else:
+                shapeIdentities = [choice(range(5)) for _ in range(n) ]
                 numberOfLabels = len([i for i in shapeIdentities if i == 3 ])
                 # make it so that there are not too many labels
                 if numberOfLabels > n/2: continue
-            
+
             return multipleObjects(rectangles = len([x for x in shapeIdentities if x == 0 ]),
                                    lines = len([x for x in shapeIdentities if x == 1 ]),
                                    circles = len([x for x in shapeIdentities if x == 2 ]),
-                                   labels = len([x for x in shapeIdentities if x == 3 ]))()
+                                   triangles = len([x for x in shapeIdentities if x == 3]),
+                                   labels = len([x for x in shapeIdentities if x == 4 ]))()
     return sampler
 
 def handleGeneration(arguments):
@@ -226,11 +234,11 @@ def handleGeneration(arguments):
     # IMPORTANT!
     # You *do not* want directories with an enormous number of files in them
     # pack it all up into a directory that we will tar together later
-    
+
     os.system('mkdir %s/%d'%(outputName,startingPoint))
     makeSyntheticData("%s/%d/%s"%(outputName,startingPoint,n), generators[n], k = k, offset = startingPoint)
     print "Generated %d training sequences into %s/%d"%(k,outputName,startingPoint)
-    
+
 if __name__ == '__main__':
     if not NIPSPRIMITIVES():
         loadCharacters()
@@ -251,7 +259,7 @@ if __name__ == '__main__':
     examplesPerBatch = totalNumberOfExamples/10 if totalNumberOfExamples > 100 else totalNumberOfExamples
     # this keeps any particular directory from getting too big
     if examplesPerBatch > 1000: examplesPerBatch = 1000
-    
+
     os.system('rm -r %s %s.tar ; mkdir %s'%(outputName,outputName,outputName))
     n = "randomScene"
     startingPoint = 0

@@ -32,7 +32,7 @@ def setCoordinateNoise(n):
     global COORDINATENOISE
     COORDINATENOISE = n
 
-    
+
 
 def randomCoordinate():
     if SNAPTOGRID:
@@ -108,7 +108,7 @@ class AbsolutePoint(Expression):
                              (self.y + y))
 
     def children(self): return [self.x,self.y]
-    
+
     @staticmethod
     def sample():
         return AbsolutePoint((randomCoordinate()), (randomCoordinate()))
@@ -128,7 +128,7 @@ class AbsolutePoint(Expression):
     def noisyEvaluate(self):
         return (self.x + truncatedNormal(-1,1)*COORDINATENOISE,
                 self.y + truncatedNormal(-1,1)*COORDINATENOISE)
-    
+
     def mutate(self):
         while True:
             if random() > 0.5:
@@ -153,7 +153,7 @@ class Label(Program):
 
     def draw(self,context):
         context.set_source_rgb(256,256,256)
-        context.select_font_face("Courier", cairo.FONT_SLANT_NORMAL, 
+        context.select_font_face("Courier", cairo.FONT_SLANT_NORMAL,
                                  cairo.FONT_WEIGHT_BOLD)
         context.set_font_size(FONTSIZE)
         (x, y, width, height, dx, dy) = context.text_extents(self.c)
@@ -187,11 +187,11 @@ class Label(Program):
         return ["\\node at %s {\\Huge \\textbf{%s}};"%(self.p.evaluate(), self.c)]
     def noisyEvaluate(self):
         return ["\\node at %s {\\Huge \\textbf{%s}};"%(self.p.noisyEvaluate(), self.c)]
-    
-        
 
 
-        
+
+
+
 class Line(Program):
     def __init__(self, points, arrow = False, solid = True):
         self.points = points
@@ -238,7 +238,7 @@ class Line(Program):
             wings = (self.points[1] - self.points[0]).rotateNinetyDegrees().normalized()*0.3
             k1 = retreat + wings
             k2 = retreat - wings
-            
+
             context.move_to(self.points[1].x*16,self.points[1].y*16)
             for p in [k1,k2,self.points[1]]:
                 context.line_to(p.x*16,p.y*16)
@@ -250,7 +250,7 @@ class Line(Program):
 
     def isDiagonal(self):
         return not (len(set(self.usedXCoordinates())) == 1 or len(set(self.usedYCoordinates())) == 1)
-    
+
     def __sub__(self,o):
         if not isinstance(o,Line): return float('inf')
         dx = sum([ abs(x1 - x2) for x1,x2 in zip(o.usedXCoordinates(),self.usedXCoordinates()) ])
@@ -264,7 +264,7 @@ class Line(Program):
                           self.points[1].y - self.points[0].y)
 
     def intersects(self,o):
-        if isinstance(o,Circle) or isinstance(o,Label) or isinstance(o,Rectangle):
+        if isinstance(o,Circle) or isinstance(o,Label) or isinstance(o,Rectangle) or isinstance(o,Triangle):
             return o.intersects(self)
         if isinstance(o,Line):
             s = self
@@ -279,7 +279,7 @@ class Line(Program):
 
     def usedXCoordinates(self): return [p.x for p in self.points ]
     def usedYCoordinates(self): return [p.y for p in self.points ]
-    
+
     def __str__(self):
         return "Line(%s, arrow = %s, solid = %s)"%(", ".join(map(str,self.points)), str(self.arrow), str(self.solid))
 
@@ -306,12 +306,12 @@ class Line(Program):
         if noisy: attributes += ["pencildraw"]
         a = ",".join(attributes)
         return "\\draw [%s] %s;" % (a," -- ".join(map(str,points)))
-    
+
     def mutate(self):
         a = self.arrow
         s = self.solid
         ps = self.points
-        
+
         mutateArrow = random() < 0.2
         mutateSolid = random() < 0.2
 
@@ -322,16 +322,16 @@ class Line(Program):
                 if random() < 0.5:
                     ps = list(reversed(ps))
             a = not a
-        
+
         if random() < 0.4 or ((not mutateArrow) and (not mutateSolid)):
             r = choice(ps)
             ps = [ (p.mutate() if p == r else p) for p in ps ]
-            
+
         if not a: ps = sorted(ps,key = lambda p: (p.x,p.y))
         mutant = Line(ps, arrow = a, solid = s)
         if mutant.length() < 1: return self.mutate()
         return mutant
-    
+
     @staticmethod
     def sample():
         while True:
@@ -340,7 +340,7 @@ class Line(Program):
             if not a: ps = sorted(ps,key = lambda p: (p.x,p.y))
             l = Line(ps, solid = random() > 0.5, arrow = a)
             if l.length() > 0.9: return l
-        
+
     def evaluate(self):
         return [Line.lineCommand([ p.evaluate() for p in self.points ],
                                  self.arrow,
@@ -393,7 +393,117 @@ class Line(Program):
 
     def usedCoordinates(self):
         return set([self.points[0].x,self.points[1].x]),set([self.points[0].y,self.points[1].y])
-                
+
+
+class Triangle(Program):
+    def __init__(self, p1, p2, p3):
+        self.p1 = p1
+        self.p2 = p2
+        self.p3 = p3
+
+    def draw(self, ctx):
+        ctx.set_line_width(STROKESIZE)
+        ctx.set_source_rgb(256,256,256)
+        ctx.move_to(self.p1.x, self.p1.y)
+        ctx.line_to(self.p2.x, self.p2.y)
+        ctx.line_to(self.p3.x, self.p3.y)
+        ctx.close_path()
+        ctx.stroke()
+
+    def constituentLines(self):
+        return [Line(self.p1, self.p2),
+                Line(self.p2, self.p3),
+                Line(self.p3, self.p1)]
+
+    def intersects(self,o):
+        for l in self.constituentLines():
+            if o.intersects(l):
+                return True
+        return False
+
+    @staticmethod
+    def command(p1,p2,p3, noisy=False):
+        attributes = ["line width = 0.1cm"]
+        if noisy:
+            attributes = ["line width = %.2fcm"%(0.1 + truncatedNormal(-1,1)*0.04)]
+        if noisy:
+            attributes += ["pencildraw"]
+        attributes = ",".join(attributes)
+        (x1,y1) = p1
+        (x2,y2) = p2
+        (x3,y3) = p3
+        p1 = "(%.2f,%.2f)"%(x1,y1)
+        p2 = "(%.2f,%.2f)"%(x2,y2)
+        p3 = "(%.2f,%.2f)"%(x3,y3)
+        return "\\draw [%s] %s -- %s -- %s -- cycle;"%(attributes,p1,p2,p3)
+
+    @staticmethod
+    def noisyLineCommand(p1,p2,p3, noisy=True):
+        return Triangle.command(p1,p2,p3,noisy)
+
+    def attachmentPoints(self):
+        return []
+
+    def evaluate(self):
+        return [Triangle.command(self.p1.evaluate(),
+            self.p2.evaluate(),
+            self.p3.evaluate())]
+
+    def noisyEvaluate(self):
+        p1,p2,p3 = self.p1,self.p2,self.p3
+        return [Triangle.noisyLineCommand(p1,p2,p3)]
+
+    @staticmethod
+    def sample():
+        while True:
+            p1 = AbsolutePoint.sample()
+            p2 = AbsolutePoint.sample()
+            p3 = AbsolutePoint.sample()
+            if p1.x == p2.x or p2.x == p3.x or p1.x == p3.x:
+                continue
+            if p1.y == p2.y or p2.y == p3.y or p1.y == p3.y:
+                continue
+            px = (p1,p2,p3)
+            xs = [p.x for p in px]
+            ys = [p.y for p in px]
+            xs.sort()
+            ys.sort()
+            x1 = xs[0]
+            x2 = xs[1]
+            x3 = xs[2]
+            y1 = ys[0]
+            y2 = ys[1]
+            y3 = ys[2]
+
+            # check if points are collinear
+            A = x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)
+            A = abs(A)
+            if A < 2:
+                continue
+            p1 = AbsolutePoint(x1,y1)
+            p2 = AbsolutePoint(x2,y2)
+            p3 = AbsolutePoint(x3,y3)
+            return Triangle(p1,p2,p3)
+
+    def __str__(self):
+        return "Triangle(%s,%s,%s)"%(str(self.p1),str(self.p2),str(self.p3))
+
+    def translate(self,x,y):
+        return Triangle(self.p1.translate(x,y),
+                self.p2.translate(x,y),
+                self.p3.translate(x,y))
+
+    def children(self):
+        return [self.p1,self.p2,self.p3]
+
+    def usedXCoordinates(self):
+        return [self.p1.x, self.p2.x, self.p3.x]
+
+    def usedYCoordinates(self):
+        return [self.p1.y, self.p2.y, self.p3.y]
+
+    def usedCoordinates(self):
+        return set(self.usedXCoordinates),set(self.usedYCoordinates)
 
 class Rectangle(Program):
     def __init__(self, p1, p2):
@@ -410,14 +520,14 @@ class Rectangle(Program):
 
     def round(self,p):
         return Rectangle(self.p1.round(p),self.p2.round(p))
-        
+
     def draw(self,context):
         context.set_line_width(STROKESIZE)
         context.set_source_rgb(256,256,256)
         context.rectangle(self.p1.x*16,self.p1.y*16,
                           (self.p2.x - self.p1.x)*16,(self.p2.y - self.p1.y)*16)
         context.stroke()
-    
+
     def logPrior(self): return -math.log(14*14*14*14)
     def translate(self,x,y):
         return Rectangle(self.p1.translate(x,y),
@@ -443,9 +553,9 @@ class Rectangle(Program):
         return [self.p1.x,self.p2.x]
     def usedYCoordinates(self):
         return [self.p1.y,self.p2.y]
-    
+
     def intersects(self,o):
-        if isinstance(o,Circle) or isinstance(o,Label): return o.intersects(self)
+        if isinstance(o,Circle) or isinstance(o,Label) or isinstance(o,Triangle): return o.intersects(self)
         if isinstance(o,Line):
             o = o.epsilonShrink() # lines are allowed to border rectangles
             for l in self.constituentLines():
@@ -457,8 +567,8 @@ class Rectangle(Program):
                     if l1.intersects(l2): return True
             return False
         raise Exception('rectangle intersection')
-        
-    
+
+
     @staticmethod
     def command(p1,p2, noisy = False):
         attributes = ["line width = 0.1cm"]
@@ -503,7 +613,7 @@ class Rectangle(Program):
         x2 = cx + w/2.0 + vertexNoise()
         y1 = cy - h/2.0 + vertexNoise()
         y2 = cy + h/2.0 + vertexNoise()
-        
+
         p1 = "(%.2f,%.2f)"%(x1,y1)
         p2 = "(%.2f,%.2f)"%(x2,y1)
         p3 = "(%.2f,%.2f)"%(x2,y2)
@@ -527,7 +637,7 @@ class Rectangle(Program):
                 p2 = p2.mutate()
             if p1.x < p2.x and p1.y < p2.y:
                 return Rectangle(p1,p2)
-        
+
     @staticmethod
     def sample():
         while True:
@@ -593,7 +703,7 @@ class Circle(Program):
         return [self.center.y,
                 self.center.y + self.radius,
                 self.center.y - self.radius]
-    
+
     @staticmethod
     def command(center, radius, noisy = False):
         noisy = "pencildraw," if noisy else ""
@@ -604,7 +714,7 @@ class Circle(Program):
         return "\\node[draw,%scircle,inner sep=0pt,minimum size = %.2fcm,%s] at %s {};"%(noisy,radius*2,lw,center)
     def __str__(self):
         return "Circle(center = %s, radius = %s)"%(str(self.center),str(self.radius))
-    
+
     def mutate(self):
         if self.radius < 3 and random() < 0.15:
             return Rectangle.absolute(self.center.x - self.radius, self.center.y - self.radius,
@@ -619,7 +729,7 @@ class Circle(Program):
             if c.inbounds():
                 return c
     def intersects(self,o):
-        if isinstance(o,Label): return o.intersects(self)
+        if isinstance(o,Label) or isinstance(o,Triangle): return o.intersects(self)
         if isinstance(o,Circle):
             x1,y1,r1 = self.center.x,self.center.y,self.radius
             x2,y2,r2 = o.center.x,o.center.y,o.radius
@@ -645,7 +755,7 @@ class Circle(Program):
             for l in o.constituentLines():
                 if self.intersects(l): return True
             return False
-            
+
     def inbounds(self):
         return inbounds(self.center.x + self.radius) and inbounds(self.center.x - self.radius) and inbounds(self.center.y + self.radius) and inbounds(self.center.y - self.radius)
     @staticmethod
@@ -691,7 +801,7 @@ class Sequence(Program):
         return all( isinstance(l,Line) for l in self.lines  ) or \
             all( isinstance(l,Rectangle) for l in self.lines  ) or \
             all( isinstance(l,Circle) for l in self.lines  )
-    
+
     def evaluate(self):
         trace = []
         for p in self.lines:
@@ -704,12 +814,12 @@ class Sequence(Program):
             cs = p.noisyEvaluate()
             trace += cs
         return (trace)
-        
+
     @staticmethod
     def sample(sz = None):
         if sz == None:
             sz = choice([1,2,3])
-        
+
         return Sequence([ Sequence.samplePart() for _ in range(sz) ])
     @staticmethod
     def samplePart():
@@ -732,7 +842,7 @@ class Sequence(Program):
     def haveOrphanLines(self):
         linePoints = [{(p.x,p.y) for p in l.points}
                       for l in self.lines
-                      if isinstance(l,Line)]                      
+                      if isinstance(l,Line)]
         for j,ps in enumerate(linePoints):
             others = [pp for i,pp in enumerate(linePoints)
                       if i != j]
@@ -799,7 +909,7 @@ class Sequence(Program):
             if c < 0 or c > MAXIMUMCOORDINATE:
                 return False
         return True
-    
+
     def framedRendering(self, reference = None):
         (x0,y0,x1,y1) = self.extent()
         return render([self.TikZ()],yieldsPixels = True,canvas = (x1,y1), x0y0 = (x0,y0))[0]
@@ -826,7 +936,7 @@ class Sequence(Program):
         else:
             W = 256
             H = 256
-            
+
         if context == None:
             data = np.zeros((W,H), dtype=np.uint8)
             surface = cairo.ImageSurface.create_for_data(data,cairo.FORMAT_A8,W,H)
@@ -903,8 +1013,8 @@ class Sequence(Program):
                                     p.points[1].y - q.points[1].y))
         return vectors
 
-    
-        
+
+
 
 
 def randomLineOfCode():
@@ -942,22 +1052,22 @@ def drawAttentionSequence(background, transformations, l):
     # illustrate the order of attention
     fs = FONTSIZE
     FONTSIZE = 15
-    
+
     colorX = 1
     for j,color in enumerate(colors[:len(transformations)]):
         output = Sequence([Label(AbsolutePoint(colorX,15),str(j+1))]).draw()
         colorX += 1
         for c in range(3):
             canvas[:,:,c] += output*color[c]
-    
+
     FONTSIZE = 8
     output = Sequence([Label(AbsolutePoint(8,1),str(l))]).draw()
     FONTSIZE = fs
-    
+
     canvas[:,:,:] += np.stack([output]*3,axis = 2)
 
     canvas[:,:,:] += np.stack([background + Sequence([l]).draw()]*3,axis = 2)
-    
+
     canvas[canvas > 1] = 1
     canvas = 1 - canvas
     canvas = (canvas*255).astype(np.uint8)
@@ -965,7 +1075,7 @@ def drawAttentionSequence(background, transformations, l):
     showImage(canvas)
 
 
-    
+
 
     data = np.flip(data, 0)[:,:,[0,1,2]].reshape((256,256,3))
     showImage(1 - data/255.0)
@@ -979,11 +1089,11 @@ def drawAttentionSequence(background, transformations, l):
     l = Sequence([l]).draw()
     l = np.stack([l]*3,axis = 2)
     composite += l
-    
+
     composite[composite > 1] = 1.0
     return 1 - composite
-    
-    
+
+
 if __name__ == '__main__':
     SNAPTOGRID = True
     s = Sequence.sample(10)
