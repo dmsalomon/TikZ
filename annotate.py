@@ -95,7 +95,7 @@ def annotate(f):
                     if line:
                         [(x1,y1),(x2,y2)] = sorted([(x,y),line])
                         if x1 != x2 or y1 != y2:
-                            program.append(Line.absoluteNumbered(x1,y1,x2,y2))
+                            program.append(Line.absolute(x1,y1,x2,y2))
                             line = None
                             modified = True
                     else:
@@ -145,7 +145,6 @@ def annotate(f):
         if rectangle != None and lastRectangle == None:
             print "RECTANGLE:",rectangle
         lastRectangle = rectangle
-        
 
         drawTransparent(0.7*output + 0.3*target)
 
