@@ -35,7 +35,7 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x
 \\end{document}
 ''' % (resolution, resolution, source)
 
-    fd, temporaryName = tempfile.mkstemp(suffix = ".tex")
+    fd, temporaryName = tempfile.mkstemp(dir="/tmp", suffix = ".tex")
 
     with os.fdopen(fd, 'w') as new_file:
         new_file.write(source)
@@ -53,14 +53,14 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x
             temporaryImages = [pattern%(temporaryPrefix,j) for j in range(len(sources)) ]
             if not all([os.path.isfile(t) for t in temporaryImages ]):
                 print "ERROR: didn't get any files without zero prefixes either. Here is the latex output:"
-                
+
                 raise Exception('No image output from latex process. prefix = %s, len(sources) = %d, fs = \n%s\n,checks = \n%s\n'%(temporaryPrefix,
                                                                                                                                    len(sources),
                                                                                                                                    "\n".join(temporaryImages),
                                                                                                                                    "\n".join(map(str,[os.path.isfile(t) for t in temporaryImages ]))))
             else:
                 print "Got it without zero prefixes"
-                
+
     if showImage:
         for temporaryImage in temporaryImages:
             os.system("feh %s" % temporaryImage)
@@ -102,7 +102,7 @@ def animateMatrices(matrices,outputFilename = None):
         # return the artists set
         return im,
     # kick off the animation
-    ani = animation.FuncAnimation(fig, updatefig, frames=range(len(matrices)), 
+    ani = animation.FuncAnimation(fig, updatefig, frames=range(len(matrices)),
                               interval=50, blit=True)
     if outputFilename != None:
         ani.save(outputFilename, dpi = 80,writer = 'imagemagick')
