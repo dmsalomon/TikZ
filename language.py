@@ -429,9 +429,9 @@ class Triangle(Program):
         if noisy:
             attributes += ["pencildraw"]
         attributes = ",".join(attributes)
-        (x1,y1) = p1
-        (x2,y2) = p2
-        (x3,y3) = p3
+        (x1,y1) = (p1.x, p1.y)
+        (x2,y2) = (p2.x, p2.y)
+        (x3,y3) = (p3.x, p3.y)
         p1 = "(%.2f,%.2f)"%(x1,y1)
         p2 = "(%.2f,%.2f)"%(x2,y2)
         p3 = "(%.2f,%.2f)"%(x3,y3)
