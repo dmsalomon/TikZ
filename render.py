@@ -76,7 +76,7 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x
             (width, height) = im.size
             if width != resolution or height != resolution:
                 im = im.resize((resolution,resolution))
-            if im.mode == 'RGBA' or im.mode == '1':
+            if im.mode == 'RGBA' or im.mode == 'RGB' or im.mode == '1':
                 im = im.convert('L')
                 scale = 255.0
             elif im.mode == 'I': # why God does this happen
