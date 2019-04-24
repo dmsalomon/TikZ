@@ -35,11 +35,12 @@ def render(sources, showImage = False, yieldsPixels = False, canvas = (16,16), x
 \\end{document}
 ''' % (resolution, resolution, source)
 
-    fd, temporaryName = tempfile.mkstemp(dir="/tmp", suffix = ".tex")
+    fd, temporaryName = tempfile.mkstemp(suffix = ".tex")
+    tempdir = os.path.dirname(temporaryName)
 
     with os.fdopen(fd, 'w') as new_file:
         new_file.write(source)
-    os.system("cd /tmp; echo X|pdflatex -shell-escape %s 2> /dev/null > /dev/null" % temporaryName)
+    os.system("cd %s; echo X|pdflatex -shell-escape %s 2> /dev/null > /dev/null" % (tempdir,temporaryName))
 
     temporaryPrefix = temporaryName[:-4]
     temporaryImages = [temporaryPrefix + ".png"]
