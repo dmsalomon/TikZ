@@ -57,7 +57,7 @@ def canonicalOrdering(things):
     ts = [t for t in things if isinstance(t,Label) ]
     ts = sorted(ts, key = lambda t: (t.p.x,t.p.y))
     bs = [b for b in things if isinstance(b,Triangle)]
-    bs = sorted(bs, key = lambda b: (b.p1.x,b.p1.y,b.p2.x,b.p2.y,b.p3.x,b.p3.y))
+    bs = sorted(bs, key = lambda b: (b.c.x,b.c.y,-b.r,b.ang))
     return cs + bs + rs + ls + ts
 
 

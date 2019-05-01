@@ -1,5 +1,5 @@
 from render import render
-from random import random,choice
+from random import random,choice,randrange
 import numpy as np
 
 from utilities import linesIntersect,truncatedNormal,showImage,applyLinearTransformation,invertTransformation,NIPSPRIMITIVES,frameImageNicely,reflectPoint
@@ -102,6 +102,16 @@ class AbsolutePoint(Expression):
     def rotateNinetyDegrees(self):
         return AbsolutePoint(self.y,
                              -self.x)
+
+    def rotateAbout(self, c, ang):
+        theta = ang*np.pi/180
+        p = self.translate(-c.x, -c.y)
+        cost = np.cos(theta)
+        sint = np.sin(theta)
+        x = p.x*cost - p.y*sint
+        y = p.x*sint + p.y*cost
+        return AbsolutePoint(x,y).translate(c.x,c.y)
+
 
     def translate(self,x,y):
         return AbsolutePoint((self.x + x),
@@ -394,14 +404,14 @@ class Line(Program):
     def usedCoordinates(self):
         return set([self.points[0].x,self.points[1].x]),set([self.points[0].y,self.points[1].y])
 
-
 class Triangle(Program):
-    def __init__(self, p1, p2, p3):
-        self.p1 = p1
-        self.p2 = p2
-        self.p3 = p3
+    def __init__(self, c, r, ang):
+        self.c = c
+        self.r = r
+        self.ang = ang
 
     def draw(self, ctx):
+        p1,p2,p3 = self.constituentPoints()
         ctx.set_line_width(STROKESIZE)
         ctx.set_source_rgb(256,256,256)
         ctx.move_to(self.p1.x, self.p1.y)
@@ -410,10 +420,20 @@ class Triangle(Program):
         ctx.close_path()
         ctx.stroke()
 
+    def constituentPoints(self):
+        c = self.c
+        r = self.r
+        ang = self.ang
+        p1 = c.translate(0,r).rotateAbout(c,ang)
+        p2 = p1.rotateAbout(c,120)
+        p3 = p2.rotateAbout(c,120)
+        return [p1,p2,p3]
+
     def constituentLines(self):
-        return [Line([self.p1, self.p2]),
-                Line([self.p2, self.p3]),
-                Line([self.p3, self.p1])]
+        p1,p2,p3 = self.constituentPoints()
+        return [Line([p1, p2]),
+                Line([p2, p3]),
+                Line([p3, p1])]
 
     def intersects(self,o):
         for l in self.constituentLines():
@@ -441,66 +461,64 @@ class Triangle(Program):
     def noisyLineCommand(p1,p2,p3, noisy=True):
         return Triangle.command(p1,p2,p3,noisy)
 
-    def attachmentPoints(self):
-        return []
-
     def evaluate(self):
-        return [Triangle.command(self.p1.evaluate(),
-            self.p2.evaluate(),
-            self.p3.evaluate())]
+        p1,p2,p3 = self.constituentPoints()
+        return [Triangle.command(p1.evaluate(),
+            p2.evaluate(),
+            p3.evaluate())]
 
     def noisyEvaluate(self):
-        p1,p2,p3 = self.p1,self.p2,self.p3
+        p1,p2,p3 = self.constituentPoints()
         return [Triangle.noisyLineCommand(p1,p2,p3)]
+
+    def mutate(self):
+        cir = Circle(self.c, self.r)
+        if random() < 0.2:
+            return cir.mutate()
+        return cir
 
     @staticmethod
     def sample():
         while True:
-            p1 = AbsolutePoint.sample()
-            p2 = AbsolutePoint.sample()
-            p3 = AbsolutePoint.sample()
-            if p1.x == p2.x or p2.x == p3.x or p1.x == p3.x:
-                continue
-            if p1.y == p2.y or p2.y == p3.y or p1.y == p3.y:
-                continue
-            px = (p1,p2,p3)
-            xs = [p.x for p in px]
-            ys = [p.y for p in px]
-            xs.sort()
-            ys.sort()
-            x1 = xs[0]
-            x2 = xs[1]
-            x3 = xs[2]
-            y1 = ys[0]
-            y2 = ys[1]
-            y3 = ys[2]
+            c = AbsolutePoint.sample()
+            r = 1 if NIPSPRIMITIVES() else sampleRadius()
+            # r = choice(range(5)) + 1 if SNAPTOGRID else (1 + random()*5)
+            ang = randrange(0, 120)
 
-            # check if points are collinear
-            A = x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)
-            A = abs(A)
-            if A < 2:
+            tri = Triangle(c,r,ang)
+
+            p1,p2,p3 = tri.constituentPoints()
+
+            if p1.x < 0 or p1.y < 0:
                 continue
-            p1 = AbsolutePoint(x1,y1)
-            p2 = AbsolutePoint(x2,y2)
-            p3 = AbsolutePoint(x3,y3)
-            return Triangle(p1,p2,p3)
+            if p2.x < 0 or p2.y < 0:
+                continue
+            if p3.x < 0 or p3.y < 0:
+                continue
+            return tri
+
+    def attachmentPoints(self):
+        p1,p2,p3 = self.constituentPoints()
+        return [(p1.x, p1.y, 'v'),
+                (p2.x, p2.y, 'h'),
+                (p3.x, p3.y, 'v')]
 
     def __str__(self):
-        return "Triangle(%s,%s,%s)"%(str(self.p1),str(self.p2),str(self.p3))
+        return "Triangle(%s,%s,%s)"%(str(self.c),str(self.c),str(self.ang))
 
     def translate(self,x,y):
-        return Triangle(self.p1.translate(x,y),
-                self.p2.translate(x,y),
-                self.p3.translate(x,y))
+        return Triangle(self.c.translate(x,y),self.r,self.ang)
 
     def children(self):
-        return [self.p1,self.p2,self.p3]
+        return self.constituentPoints()
 
     def usedXCoordinates(self):
-        return [self.p1.x, self.p2.x, self.p3.x]
+        p1,p2,p3 = self.constituentPoints()
+        return [p1.x, p2.x, p3.x]
 
     def usedYCoordinates(self):
-        return [self.p1.y, self.p2.y, self.p3.y]
+        p1,p2,p3 = self.constituentPoints()
+        return [p1.y, p2.y, p3.y]
 
     def usedCoordinates(self):
         return set(self.usedXCoordinates),set(self.usedYCoordinates)
