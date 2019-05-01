@@ -1,5 +1,5 @@
 from render import render
-from random import random,choice,randrange
+from random import random,choice
 import numpy as np
 
 from utilities import linesIntersect,truncatedNormal,showImage,applyLinearTransformation,invertTransformation,NIPSPRIMITIVES,frameImageNicely,reflectPoint
@@ -151,6 +151,11 @@ class AbsolutePoint(Expression):
             if inbounds(dp):
                 return AbsolutePoint((dp[0]),(dp[1]))
 
+    def onplane(self):
+        return (self.x > 0 and
+                self.y > 0 and
+                self.x < MAXIMUMCOORDINATE and
+                self.y < MAXIMUMCOORDINATE)
 
 class Label(Program):
     allowedLabels = ['A','B','C','X','Y','Z']
@@ -414,9 +419,9 @@ class Triangle(Program):
         p1,p2,p3 = self.constituentPoints()
         ctx.set_line_width(STROKESIZE)
         ctx.set_source_rgb(256,256,256)
-        ctx.move_to(self.p1.x, self.p1.y)
-        ctx.line_to(self.p2.x, self.p2.y)
-        ctx.line_to(self.p3.x, self.p3.y)
+        ctx.move_to(16*p1.x, 16*p1.y)
+        ctx.line_to(16*p2.x, 16*p2.y)
+        ctx.line_to(16*p3.x, 16*p3.y)
         ctx.close_path()
         ctx.stroke()
 
@@ -483,19 +488,15 @@ class Triangle(Program):
             c = AbsolutePoint.sample()
             r = 1 if NIPSPRIMITIVES() else sampleRadius()
             # r = choice(range(5)) + 1 if SNAPTOGRID else (1 + random()*5)
-            ang = randrange(0, 120)
+            ang = 120*random()
 
             tri = Triangle(c,r,ang)
+            if tri.onplane():
+                return tri
 
-            p1,p2,p3 = tri.constituentPoints()
-
-            if p1.x < 0 or p1.y < 0:
-                continue
-            if p2.x < 0 or p2.y < 0:
-                continue
-            if p3.x < 0 or p3.y < 0:
-                continue
-            return tri
+    def onplane(self):
+        p1, p2, p3 = self.constituentPoints()
+        return p1.onplane() and p2.onplane() and p3.onplane()
 
     def attachmentPoints(self):
         p1,p2,p3 = self.constituentPoints()

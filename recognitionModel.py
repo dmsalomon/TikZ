@@ -28,7 +28,7 @@ TESTINGFRACTION = 0.05
 CONTINUOUSROUNDING = 1
 ATTENTIONCANROTATE = True
 
-[STOP,CIRCLE,LINE,RECTANGLE,LABEL] = range(5)
+[STOP,CIRCLE,TRIANGLE,LINE,RECTANGLE,LABEL] = range(6)
 
 
 class StandardPrimitiveDecoder():
@@ -233,6 +233,56 @@ class CircleDecoder(StandardPrimitiveDecoder):
                     l.center.y] + ([] if NIPSPRIMITIVES() else [l.radius])
         return [0,0] + ([] if NIPSPRIMITIVES() else [0])
 
+class TriangleDecoder(StandardPrimitiveDecoder):
+    token = TRIANGLE
+    languagePrimitive = Triangle
+
+    def __init__(self, imageRepresentation, continuous, attention):
+        if attention > 0:
+            self.attentionIndices = [1,2,3]
+            self.attentionSize = attention
+        if continuous:
+            self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*4# x,y,r,a
+            self.hiddenSizes = [None]*4
+        else:
+            self.outputDimensions = [(int,MAXIMUMCOORDINATE)]*4 # x,y,r,a
+            self.hiddenSizes = [None]*4
+
+        if NIPSPRIMITIVES(): # fixed radius: remove it
+            if attention > 0:
+                self.attentionIndices = self.attentionIndices[:-1]
+            self.outputDimensions = self.outputDimensions[:-1]
+            self.hiddenSizes = self.hiddenSizes[:-1]
+
+        self.makeNetwork(imageRepresentation)
+
+    def beam(self, session, feed, beamSize):
+        if NIPSPRIMITIVES():
+            r = 1
+            res = []
+            for s,[x,y,a] in self.beamTrace(session, feed, beamSize):
+                tri = Triangle(AbsolutePoint(x,y),r,a)
+                if tri.onplane():
+                    res.append((s, tri))
+            return res
+        else:
+            raise Exception()
+
+    def sample(self, session, feed):
+        if NIPSPRIMITIVES():
+            r = 1
+            [x,y,a] = self.sampleTrace(session, feed)
+            return Triangle(AbsolutePoint(x,y),r,a)
+        else: assert False
+
+    @staticmethod
+    def extractTargets(l):
+        if l != None and isinstance(l,Triangle):
+            return [l.c.x,
+                    l.c.y] + ([] if NIPSPRIMITIVES() else [l.r]) + [l.ang]
+        return [0,0] + ([] if NIPSPRIMITIVES() else [0]) + [0]
+
+
 class LabelDecoder(StandardPrimitiveDecoder):
     token = LABEL
     languagePrimitive = Label
@@ -346,7 +396,7 @@ class StopDecoder():
 
 class PrimitiveDecoder():
     # It shouldn't matter in what order these are listed. If it does then I will consider that a bug.
-    decoderClasses = [CircleDecoder, RectangleDecoder, LineDecoder, StopDecoder] if NIPSPRIMITIVES() else [CircleDecoder, RectangleDecoder, LineDecoder, LabelDecoder, StopDecoder]
+    decoderClasses = [CircleDecoder, TriangleDecoder, RectangleDecoder, LineDecoder, StopDecoder] if NIPSPRIMITIVES() else [CircleDecoder, TriangleDecoder, RectangleDecoder, LineDecoder, LabelDecoder, StopDecoder]
     def __init__(self, imageRepresentation, trainingPredicatePlaceholder, continuous, attention):
         self.decoders = [k(imageRepresentation,continuous,attention) for k in PrimitiveDecoder.decoderClasses]
 
@@ -659,16 +709,10 @@ class RecognitionModel():
         cs = np.array(cs)
         ps = np.array(ps)
 
-
-
-
         if False:
             for j in range(10):
                 print ps[j,:]
                 showImage(np.concatenate([gs[j],cs[j]]))
-
-
-
 
         f = {self.goalPlaceholder: gs,
              self.currentPlaceholder: cs}
