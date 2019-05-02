@@ -1,4 +1,4 @@
 venv
-syntheticTrainingData
-syntheticTrainingData.tar
+synthetic*TrainingData
+synthetic*TrainingData.tar
 *.pyc
