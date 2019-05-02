@@ -238,21 +238,18 @@ class TriangleDecoder(StandardPrimitiveDecoder):
     languagePrimitive = Triangle
 
     def __init__(self, imageRepresentation, continuous, attention):
+        if not NIPSPRIMITIVES():
+            raise Exception()
+
         if attention > 0:
-            self.attentionIndices = [1,2,3]
+            self.attentionIndices = [1,2]
             self.attentionSize = attention
         if continuous:
-            self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*4# x,y,r,a
-            self.hiddenSizes = [None]*4
+            self.outputDimensions = [(float,MAXIMUMCOORDINATE)]*3 # x,y,r,a
+            self.hiddenSizes = [None]*3
         else:
-            self.outputDimensions = [(int,MAXIMUMCOORDINATE)]*4 # x,y,r,a
-            self.hiddenSizes = [None]*4
-
-        if NIPSPRIMITIVES(): # fixed radius: remove it
-            if attention > 0:
-                self.attentionIndices = self.attentionIndices[:-1]
-            self.outputDimensions = self.outputDimensions[:-1]
-            self.hiddenSizes = self.hiddenSizes[:-1]
+            self.outputDimensions = [(int,MAXIMUMCOORDINATE)]*2 + [(int,120)]# x,y,r,a
+            self.hiddenSizes = [None]*3
 
         self.makeNetwork(imageRepresentation)
 
@@ -280,7 +277,8 @@ class TriangleDecoder(StandardPrimitiveDecoder):
         if l != None and isinstance(l,Triangle):
             return [l.c.x,
                     l.c.y] + ([] if NIPSPRIMITIVES() else [l.r]) + [l.ang]
-        return [0,0] + ([] if NIPSPRIMITIVES() else [0]) + [0]
+            # return [l.c.x,l.c.y,l.r,l.ang]
+        return [0]*3 + ([] if NIPSPRIMITIVES() else [0])
 
 
 class LabelDecoder(StandardPrimitiveDecoder):
@@ -536,6 +534,7 @@ class RecurrentDecoder():
                               [MAXIMUMCOORDINATE]*4 + [2,2], # line
                               []] # stop
         builders = [lambda x,y: Circle(AbsolutePoint(x,y),1),
+                    lambda x,y,r,a: Triangle(AbsolutePoint(x,y),r,a),
                     lambda a,b,p,q: Rectangle.absolute(a,b,p,q),
                     lambda a,b,p,q,arrow, solid: Line.absolute(a,b,p,q,arrow = arrow == 1,solid = solid == 1)]
         def Checker(sequence):
@@ -793,6 +792,7 @@ class RecognitionModel():
                   for f in failures ]
         print ranks
         print "In the frontier %d/%d"%(len([r for r in ranks if r != None ]),len(ranks))
+
         ranks = [r for r in ranks if r != None ]
         print ranks
         if len(ranks) > 0:
@@ -801,6 +801,8 @@ class RecognitionModel():
         # How many failures were of each type
         print "Circle failures: %d"%(len([ None for f in failures
                                            if isinstance(f['target'],Circle)]))
+        print "Triangle failures: %d"%(len([ None for f in failures
+                                           if isinstance(f['target'],Triangle)]))
         print "Line failures: %d"%(len([ None for f in failures
                                            if isinstance(f['target'],Line)]))
         print "Rectangle failures: %d"%(len([ None for f in failures
