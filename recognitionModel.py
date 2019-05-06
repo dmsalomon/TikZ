@@ -1231,6 +1231,8 @@ class SearchModel():
 
             saveMatrixAsImage(n.program.draw()*255, "%s/%d.png"%(parseDirectory, j))
             pickle.dump(n, open("%s/particle%d.p"%(parseDirectory, j),'wb'))
+            with open("%s/particle%d.txt"%(parseDirectory, j),'w') as f:
+                f.write(str(n.program))
 
     def evaluateAccuracy(self):
         # similar map but for the rank of the correct program

@@ -482,6 +482,8 @@ class Triangle(Program):
             return cir.mutate()
         return cir
 
+    def logPrior(self): return -math.log(14*14*120)
+
     @staticmethod
     def sample():
         while True:
