@@ -653,7 +653,7 @@ class RecognitionModel():
             else:
                 saver.restore(self.session, self.checkpointPath)
 
-            for e in range(2):
+            for e in range(100):
                 epicLoss = []
                 epicAccuracy = []
                 for ts,ps in iterator.epochExamples():
@@ -929,7 +929,7 @@ class DistanceModel():
                 self.session.run(initializer)
             else:
                 saver.restore(self.session, self.checkpointPath)
-            for e in range(2):
+            for e in range(20):
                 runningAverage = 0.0
                 runningAverageCount = 0
                 lastUpdateTime = time()
