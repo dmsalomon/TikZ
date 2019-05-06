@@ -45,7 +45,7 @@ def sampleRadius():
 
 def randomCoordinatePerturbation():
     if SNAPTOGRID:
-        return choice([-1,-2,1,-2])
+        return choice([-1,-2,1,2])
     else:
         return 4*random() + 2
 
@@ -478,9 +478,13 @@ class Triangle(Program):
 
     def mutate(self):
         cir = Circle(self.c, self.r)
-        if random() < 0.2:
+        if random() > 0.4:
             return cir.mutate()
-        return cir
+        else:
+            while True:
+                tri = Triangle(self.c.mutate(),self.r,self.ang)
+                if tri.onplane():
+                    return tri
 
     @staticmethod
     def sample():
@@ -496,7 +500,7 @@ class Triangle(Program):
 
     def onplane(self):
         p1, p2, p3 = self.constituentPoints()
-        return p1.onplane() and p2.onplane() and p3.onplane()
+        return inbounds((p1.x,p1.y)) and inbounds((p2.x,p2.y)) and inbounds((p3.x,p3.y))
 
     def attachmentPoints(self):
         p1,p2,p3 = self.constituentPoints()
@@ -745,8 +749,10 @@ class Circle(Program):
                 if self.radius < 2: r = self.radius + 1
                 else: r = self.radius + randomRadiusPerturbation()
                 c = Circle(self.center, r)
-            if c.inbounds():
-                return c
+            if not c.inbounds():
+                return Rectangle.absolute(self.center.x - self.radius, self.center.y - self.radius,
+                                          self.center.x + self.radius, self.center.y + self.radius)
+            return c
     def intersects(self,o):
         if isinstance(o,Label) or isinstance(o,Triangle): return o.intersects(self)
         if isinstance(o,Circle):
@@ -777,6 +783,7 @@ class Circle(Program):
 
     def inbounds(self):
         return inbounds(self.center.x + self.radius) and inbounds(self.center.x - self.radius) and inbounds(self.center.y + self.radius) and inbounds(self.center.y - self.radius)
+
     @staticmethod
     def sample():
         while True:
@@ -819,7 +826,8 @@ class Sequence(Program):
     def onlyOneKindOfObject(self):
         return all( isinstance(l,Line) for l in self.lines  ) or \
             all( isinstance(l,Rectangle) for l in self.lines  ) or \
-            all( isinstance(l,Circle) for l in self.lines  )
+            all( isinstance(l,Circle) for l in self.lines  ) or \
+            all( isinstance(l,Triangle) for l in self.lines  )
 
     def evaluate(self):
         trace = []
@@ -1037,13 +1045,14 @@ class Sequence(Program):
 
 
 def randomLineOfCode():
-    k = choice(range(5))
+    k = choice(range(6))
     if k == 0: return None
     if k == 1: return Circle.sample()
     if k == 2: return Line.sample()
     if k == 3: return Rectangle.sample()
+    if k == 4: return Triangle.sample()
     if NIPSPRIMITIVES(): return randomLineOfCode()
-    if k == 4: return Label.sample()
+    if k == 5: return Label.sample()
     assert False
 
 def drawAttentionSequence(background, transformations, l):

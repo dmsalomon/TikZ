@@ -2,3 +2,4 @@ venv
 synthetic*TrainingData
 synthetic*TrainingData.tar
 *.pyc
+checkpoints
